@@ -23,6 +23,7 @@ const OUTPUT_DIR   = joinpath(@__DIR__, "src/generated")
 
 examples = [
     "Box model" => "box",
+    "Box model" => "boxey",    
     "Simple column model" => "column",
     "Baroclinic instability" => "eady",
     "Data forced column model" => "data_forced",
@@ -81,7 +82,8 @@ parameter_pages = ["$name" => "generated/$(name)_parameters.md" for name in mode
 bgc_pages = [
     "Overview" => "model_components/biogeochemical/index.md",
     "LOBSTER" => "model_components/biogeochemical/LOBSTER.md",
-    "NPZD" => "model_components/biogeochemical/NPZ.md"
+    "NPZD" => "model_components/biogeochemical/NPZ.md",
+    "OXYDEP" => "model_components/biogeochemical/OD.md"
 ]
 
 sediments_pages = [

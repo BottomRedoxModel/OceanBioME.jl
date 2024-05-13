@@ -123,7 +123,7 @@ end
 
 function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
     arch = architecture(model.grid)
-    launch!(arch, model.grid, :xy, update_TwoBandPhotosyntheticallyActiveRadiation!, PAR.field, model.grid, model.tracers.P, PAR.surface_PAR, model.clock.time, PAR)
+    launch!(arch, model.grid, :xy, update_TwoBandPhotosyntheticallyActiveRadiation!, PAR.field, model.grid, model.tracers.PHY, PAR.surface_PAR, model.clock.time, PAR)
 
     fill_halo_regions!(PAR.field, model.clock, fields(model))
 end

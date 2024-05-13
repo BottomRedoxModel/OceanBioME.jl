@@ -1,5 +1,5 @@
 using Oceananigans, Test
-using OceanBioME: TwoBandPhotosyntheticallyActiveRadiation, LOBSTER, NutrientPhytoplanktonZooplanktonDetritus
+using OceanBioME: TwoBandPhotosyntheticallyActiveRadiation, LOBSTER, NutrientPhytoplanktonZooplanktonDetritus, OxygenDepletionModel
 using Oceananigans.Biogeochemistry: update_biogeochemical_state!, required_biogeochemical_tracers, biogeochemical_auxiliary_fields
 
 Pᵢ(x,y,z) = 2.5 + z
@@ -47,7 +47,7 @@ end
     for model in (NonhydrostaticModel, HydrostaticFreeSurfaceModel),
         grid in (RectilinearGrid(architecture; size = (2, 2, 2), extent = (2, 2, 2)), 
                  LatitudeLongitudeGrid(architecture; size = (5, 5, 2), longitude = (-180, 180), latitude = (-85, 85), z = (-2, 0))),
-        bgc in (LOBSTER, NutrientPhytoplanktonZooplanktonDetritus) # this is now redundant since each model doesn't deal with the light separatly
+        bgc in (LOBSTER, NutrientPhytoplanktonZooplanktonDetritus, OxygenDepletionModel) # this is now redundant since each model doesn't deal with the light separatly
 
         if !((model == NonhydrostaticModel) && ((grid isa LatitudeLongitudeGrid) | (grid isa OrthogonalSphericalShellGrid)))
             @info "Testing $bgc in $model on $grid..."

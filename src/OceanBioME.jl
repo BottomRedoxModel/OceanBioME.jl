@@ -5,7 +5,7 @@ between ocean biogeochemistry, carbonate chemistry, and physics.
 module OceanBioME
 
 # Biogeochemistry models
-export Biogeochemistry, LOBSTER, NutrientPhytoplanktonZooplanktonDetritus, NPZD, redfield
+export Biogeochemistry, LOBSTER, NutrientPhytoplanktonZooplanktonDetritus, NPZD, OxygenDepletionModel, redfield, OXYDEP, OxygenDepletionModel
 
 # Macroalgae models
 export SLatissima
@@ -186,6 +186,7 @@ using .Light
 using .BoxModels
 using .LOBSTERModel
 using .NPZDModel
+using .OXYDEPModel
 import .SLatissimaModel.SLatissima
 
 end #module
