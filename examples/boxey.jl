@@ -24,7 +24,7 @@ PAR⁰(t) = 60 * (1 - cos((t + 15days) * 2π / year)) * (1 / (1 + 0.2 * exp(-((m
 z = -10 # specify the nominal depth of the box for the PAR profile
 PAR(t) = PAR⁰(t) * exp(0.2z) # Modify the PAR based on the nominal depth and exponential decay
 
-temp(t) = 15 # 2.4 * cos(t * 2π / year + 50days) + 10
+temp(t) = 2.4 * cos(t * 2π / year + 50days) + 10
 
 nothing #hide
 
