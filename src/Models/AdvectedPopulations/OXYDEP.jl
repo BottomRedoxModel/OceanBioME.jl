@@ -154,51 +154,50 @@ struct OxygenDepletionModel{FT, W} <: AbstractContinuousFormBiogeochemistry
 end
 
 function OxygenDepletionModel(; grid,
-                                                   initial_photosynthetic_slope::FT = 0.1953 / day, # 1/(W/m²)/s
-                                                   Iopt::FT = 50.,     # (W/m2)
-                                                   alphaI::FT = 1.8,   # [d-1/(W/m2)]
-                                                   betaI::FT = 5.2e-4, # [d-1/(W/m2)]
-                                                   gammaD::FT = 0.71,  # (-)
-                                                   Max_uptake::FT = 4 / day,  # 1/d
-                                                   Knut::FT = 1.,            # (nd)
-                                                   r_phy_nut::FT = 0.05 / day, # 1/d
-                                                   r_phy_pom::FT = 0.15 / day, # 1/d
-                                                   r_phy_dom::FT = 0.17 / day, # 1/d
-                                                   r_phy_het::FT = 0.4 / day,  # 1/d
-                                                   Kphy::FT = 0.7,             # (nd)
-                                                   r_pom_het::FT = 0.7 / day,  # 1/d
-                                                   Kpom::FT = 2.0,     # (nd)
-                                                   Uz::FT = 0.6,       # (nd)
-                                                   Hz::FT = 0.5,       # (nd)
-                                                   r_het_nut::FT = 0.05 / day,      # 1/d
-                                                   r_het_pom::FT = 0.02 / day,      # 1/d
-                                                   r_pom_nut_oxy::FT = 0.006 / day, # 1/d
-                                                   r_pom_dom::FT = 0.005 /day,      # 1/d
-                                                   r_dom_nut_oxy::FT = 0.010 /day,  # 1/d
-                                                   O2_suboxic::FT = 30.,    # mmol/m3
-                                                   r_pom_nut_nut::FT = 0.010 /day, # 1/d
-                                                   r_dom_nut_nut::FT = 0.003 /day, # 1/d
-                                                   OtoN::FT = 8.625, # (nd)
-                                                   CtoN::FT = 6.625, # (nd)
-                                                   NtoN::FT = 5.3,   # (nd)
-                                                   NtoB::FT = 0.016, # (nd)
+                                   initial_photosynthetic_slope::FT = 0.1953 / day, # 1/(W/m²)/s
+                                   Iopt::FT = 50.,     # (W/m2)
+                                   alphaI::FT = 1.8,   # [d-1/(W/m2)]
+                                   betaI::FT = 5.2e-4, # [d-1/(W/m2)]
+                                   gammaD::FT = 0.71,  # (-)
+                                   Max_uptake::FT = 2.0 / day,  # 1/d 4 5
+                                   Knut::FT = 2.,            # (nd)
+                                   r_phy_nut::FT = 0.05 / day, # 1/d
+                                   r_phy_pom::FT = 0.15 / day, # 1/d
+                                   r_phy_dom::FT = 0.17 / day, # 1/d
+                                   r_phy_het::FT = 0.4 / day,  # 1/d
+                                   Kphy::FT = 0.7,             # (nd)
+                                   r_pom_het::FT = 0.7 / day,  # 1/d
+                                   Kpom::FT = 2.0,     # (nd)
+                                   Uz::FT = 0.6,       # (nd)
+                                   Hz::FT = 0.5,       # (nd)
+                                   r_het_nut::FT = 0.05 / day,      # 1/d
+                                   r_het_pom::FT = 0.02 / day,      # 1/d
+                                   r_pom_nut_oxy::FT = 0.006 / day, # 1/d
+                                   r_pom_dom::FT = 0.01 /day,      # 1/d
+                                   r_dom_nut_oxy::FT = 0.050 /day,  # 1/d
+                                   O2_suboxic::FT = 30.,    # mmol/m3
+                                   r_pom_nut_nut::FT = 0.010 /day, # 1/d
+                                   r_dom_nut_nut::FT = 0.003 /day, # 1/d
+                                   OtoN::FT = 8.625, # (nd)
+                                   CtoN::FT = 6.625, # (nd)
+                                   NtoN::FT = 5.3,   # (nd)
+                                   NtoB::FT = 0.016, # (nd)
 
+                                   surface_photosynthetically_active_radiation = default_surface_PAR,
 
-                                                   surface_photosynthetically_active_radiation = default_surface_PAR,
-
-                                                   light_attenuation_model::LA =
-                                                       TwoBandPhotosyntheticallyActiveRadiation(; grid, 
-                                                                                                  surface_PAR = surface_photosynthetically_active_radiation),
+                                   light_attenuation_model::LA =
+                                       TwoBandPhotosyntheticallyActiveRadiation(; grid, 
+                                                                                  surface_PAR = surface_photosynthetically_active_radiation),
                                                                                                   
-                                                   sediment_model::S = nothing,
+                                   sediment_model::S = nothing,
  
-                                                   sinking_speeds = (PHY = 0.3/day, HET = 0.1/day, POM = 3.0/day),
-                                                   open_bottom::Bool = true,
+                                   sinking_speeds = (PHY = 0.1/day, HET = 0.01/day, POM = 3.0/day),
+                                   open_bottom::Bool = true,
 
-                                                   scale_negatives = false,
+                                   scale_negatives = false,
                                                                             
-                                                   particles::P = nothing,
-                                                   modifiers::M = nothing) where {FT, LA, S, P, M}
+                                   particles::P = nothing,
+                                   modifiers::M = nothing) where {FT, LA, S, P, M}
     sinking_velocities = setup_velocity_fields(sinking_speeds, grid, open_bottom)
 
     underlying_biogeochemistry = 
@@ -247,8 +246,8 @@ end
 const OXYDEP = OxygenDepletionModel
 
 required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM,  :DOM, :OXY)
-#required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
-required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
+required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
+#required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
 
 # Limiting equations and switches
 @inline yy(value,consta)=consta^2/(value^2+consta^2)   #This is a squared Michaelis-Menten type of limiter
@@ -266,7 +265,7 @@ required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
     # = exp(temp_aug_rate*(T-t_0)):  t_0= 0. !reference temperature temp_aug_rate = 0.0663 !temperature augmentation rate
 #@inline light_limitation(PAR, α, Max_uptake) = α * PAR / sqrt(Max_uptake ^ 2 + α ^ 2 * PAR ^ 2)
 
-#@inline GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY) = Max_uptake*LimT(T)*LimN(Knut,NUT,PHY)*light_limitation(PAR,α,Max_uptake)*PHY
+#@inline GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt) = Max_uptake*LimT(T)*LimN(Knut,NUT,PHY)*light_limitation(PAR,α,Max_uptake)*PHY*Iopt/Iopt
 @inline GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt) = Max_uptake*LimT(T)*LimN(Knut,NUT,PHY)*LimLight(PAR,Iopt)*α/α
 @inline RespPhy(r_phy_nut,PHY) = r_phy_nut * PHY
 @inline MortPhy(r_phy_pom,PHY) = r_phy_pom * PHY
@@ -306,6 +305,9 @@ required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
     O2_suboxic = bgc.O2_suboxic
     r_dom_nut_nut = bgc.r_dom_nut_nut
     Iopt=bgc.Iopt
+
+    #println(GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt))
+    #wait_for_key("press any key to continue")
 
     return (RespPhy(r_phy_nut,PHY) + RespHet(r_het_nut,HET) + DOM_decay_ox(r_dom_nut_oxy,DOM) 
            + POM_decay_ox(r_pom_nut_oxy,POM) - GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt) 
@@ -397,14 +399,15 @@ end
     OtoN = bgc.OtoN
     O2_suboxic = bgc.O2_suboxic
     Iopt=bgc.Iopt
-
-    return (- OtoN * (RespPhy(r_phy_nut,PHY) + RespHet(r_het_nut,HET) # due to OM production and decay in normoxia
-           - GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt) 
-           + POM_decay_ox(r_pom_nut_oxy,POM) 
-           + DOM_decay_ox(r_dom_nut_oxy,DOM) * (1. + F_subox(OXY,O2_suboxic))
-           ))
+    
+    return (- OtoN * 
+            (RespPhy(r_phy_nut,PHY) + RespHet(r_het_nut,HET) + DOM_decay_ox(r_dom_nut_oxy,DOM) 
+             + POM_decay_ox(r_pom_nut_oxy,POM) - GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt) # due to OM production and decay in normoxia
+             + DOM_decay_ox(r_dom_nut_oxy,DOM) * (F_subox(OXY,O2_suboxic))
+            )
+           )
 # (POM_decay_denitr + DOM_decay_denitr) & !denitrification doesn't change oxygen
-# additional consumption of OXY due to oxidation of reduced froms of S,Mn,Fe etc.
+# (DOM_decay_ox(r_dom_nut_oxy,DOM)*(F_subox) !additional consumption of OXY due to oxidation of reduced froms of S,Mn,Fe etc.
 # in suboxic conditions (F_subox) equals consumption for NH4 oxidation (Yakushev et al, 2008)
 
 end
