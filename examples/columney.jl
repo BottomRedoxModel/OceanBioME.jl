@@ -15,6 +15,7 @@
 # We load the packages and choose the default LOBSTER parameter set
 using OceanBioME, Oceananigans, Printf
 using OceanBioME: Boundaries, GasExchange
+using OceanBioME.Boundaries.Sediments: sinking_flux
 using OceanBioME.SLatissimaModel: SLatissima
 using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
@@ -27,17 +28,11 @@ nothing #hide
 # Setting up idealised functions for PAR and diffusivity (details here can be ignored but these are typical of the North Atlantic)
 
 @inline PAR⁰(x, y, t) = 60 * (1 - cos((t + 15days) * 2π / year)) * (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
-
 @inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
-
 @inline fmld1(t) = H(t, 50days, year) * (1 / (1 + exp(-(t - 100days) / 5days))) * (1 / (1 + exp((t - 330days) / 25days)))
-
 @inline MLD(t) = - (10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
-
 @inline κₜ(x, y, z, t) = 1e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 0.5e-4    ### 1e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1e-4
-
 @inline temp(x, y, z, t) = 2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 10
-
 @inline salt(x, y, z, t) = (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 33
 
 nothing #hide
@@ -47,7 +42,6 @@ nothing #hide
 depth_extent=40meters
 grid = RectilinearGrid(size = (1, 1, 10), extent = (20meters, 20meters, depth_extent))
 
-#PAR = PAR⁰
 # ## Model
 # First we define the biogeochemical model including carbonate chemistry (for which we also define temperature (``T``) and salinity (``S``) fields)
 # and scaling of negative tracers(see discussion in the [positivity preservation](@ref pos-preservation))
@@ -61,64 +55,70 @@ grid = RectilinearGrid(size = (1, 1, 10), extent = (20meters, 20meters, depth_ex
 biogeochemistry = OXYDEP(; grid, 
                           surface_photosynthetically_active_radiation = PAR⁰,
                           particles = nothing)
-# for bottom boundary
-O2_suboxic = 30.0 
-Trel = 100000.
-b_ox = 20.0
-b_NUT = 20.
-b_DOM_ox = 2.0
-b_DOM_anox =10.0
-
-@inline F_ox(conc,threshold)=(0.5+0.5*tanh(conc-threshold))
-@inline F_subox(conc,threshold)=(0.5-0.5*tanh(conc-threshold))
 
 clock = Clock(; time = 0.0)
 T = FunctionField{Center, Center, Center}(temp, grid; clock)
 S = FunctionField{Center, Center, Center}(salt, grid; clock)
-#S = ConstantField(35)
-# OXY_bcs = FieldBoundaryConditions(top = GasExchange(; gas = :O₂))
+
+# for the bottom boundary
+O2_suboxic = 30.0 
+Trel = 100000. # relaxation time, s
+b_ox = 50.0 #15.0    # dufference of DO conc. across SWI, uM
+b_NUT = 20.
+b_DOM_ox = 2.0
+b_DOM_anox =10.0
+
+@inline F_ox(conc,threshold)    = (0.5+0.5*tanh(conc-threshold))
+@inline F_subox(conc,threshold) = (0.5-0.5*tanh(conc-threshold))
 
 #@inline speedᶠᶜᶜ(i, j, k, grid, fields) = @inbounds sqrt(fields.u[i, j, k]^2 + ℑxyᶠᶜᵃ(i, j, k, grid, fields.v)^2)
-#@inline speedᶜᶠᶜ(i, j, k, grid, fields) = @inbounds sqrt(fields.v[i, j, k]^2 + ℑxyᶜᶠᵃ(i, j, k, grid, fields.u)^2)
 #@inline u_bottom_drag(i, j, grid, clock, fields, μ) = @inbounds - μ * fields.u[i, j, 1] * speedᶠᶜᶜ(i, j, 1, grid, fields)
-#@inline v_bottom_drag(i, j, grid, clock, fields, μ) = @inbounds - μ * fields.v[i, j, 1] * speedᶜᶠᶜ(i, j, 1, grid, fields)
 #@inline u_immersed_bottom_drag(i, j, k, grid, clock, fields, μ) = @inbounds - μ * fields.u[i, j, k] * speedᶠᶜᶜ(i, j, k, grid, fields)
-#@inline v_immersed_bottom_drag(i, j, k, grid, clock, fields, μ) = @inbounds - μ * fields.v[i, j, k] * speedᶜᶠᶜ(i, j, k, grid, fields)
 #@inline OXY_bottom_cond(i, j, k, grid, clock, fields) =  (F_ox(fields.OXY[i,j,1], O2_suboxic) * (b_ox - fields.OXY[i,j,1]) 
 #                                                        + F_subox(fields.OXY[i,j,1], O2_suboxic) * (0.0 - fields.OXY[i,j,1]))/ Trel
-OXY_bbl = fields.OXY[i, j, 1]
-
-@inline OXY_bottom_cond(i, j, k, grid, clock, fields) =  (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_ox - fields.OXY[i,j,1]) )/ Trel
-#@inline OXY_bottom_cond(i, j, k, grid, clock, fields) =  (F_ox(fields.OXY[i,j,1], O2_suboxic) * (b_ox - fields.OXY[i,j,1]) 
-#                                                        + F_subox(fields.OXY[i,j,1], O2_suboxic) * (0.0 - fields.OXY[i,j,1]))/ Trel                                                        
-
-#@inline NUT_bottom_cond(i, j, k, grid, clock, fields) =  (F_ox(fields.OXY[i,j,1], O2_suboxic) * (b_NUT - fields.NUT[i,j,1]) 
-#                                                        + F_subox(fields.OXY[i,j,1], O2_suboxic) * (0.0 - fields.NUT[i,j,1]))/ Trel       
-
-#@inline DOM_bottom_cond(i, j, k, grid, clock, fields) =  (F_ox(fields.OXY[i,j,1], O2_suboxic) * (b_DOM_ox - fields.DOM[i,j,1]) 
-#                                                        + F_subox(fields.OXY[i,j,1], O2_suboxic) * 2 * (b_DOM_anox - fields.DOM[i,j,1]))/ Trel                                                        
-
+#model.tracers
+#fields.u[i, j, k]
+#fields
+#fields.OXY
+#OXY_bbl = OXYDEP.OXY[i, j, 1]
+#OXY_bbl = fields.OXY[i, j, 1]
 #drag_u = FluxBoundaryCondition(u_immersed_bottom_drag, discrete_form=true, parameters = μ)
-OXY_bottom_flux = FluxBoundaryCondition(OXY_bottom_cond, discrete_form=false,  field_dependencies=:OXY)
+#####OXY_bottom_flux = FluxBoundaryCondition(OXY_bottom_cond, discrete_form=false,  field_dependencies=(:OXY))
 #u_immersed_bc = ImmersedBoundaryCondition(bottom = drag_u,
 #                                          west = no_slip_bc,
 #                                          east = no_slip_bc,
 #                                          south = no_slip_bc,
 #                                          north = no_slip_bc)
-
-
 #u_bottom_drag_bc = FluxBoundaryCondition(u_bottom_drag, discrete_form = true, parameters = μ)
 
-
 # Model instantiation
+
+OXY_top = GasExchange(; gas = :OXY)
+@inline OXY_bottom_cond(i, j, grid, clock, fields) =  
+    @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * b_ox + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.OXY[i, j, 1])) / Trel
+OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
+
+
+@inline DOM_bottom_cond(i, j, k, grid, clock, fields) =  
+    @inbounds  (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1]))/ Trel
+DOM_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
+
+#@inline NUT_bottom_con(i, j, k, grid, clock, fields) =  
+#    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])) / Trel       
+
+    #    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1]))/ Trel
+
+#NUT_bottom = FluxBoundaryCondition(NUT_bottom_con,  discrete_form = true,) #ValueBoundaryCondition(10.0)
+NUT_bottom = ValueBoundaryCondition(10.0)
 
 model = NonhydrostaticModel(; grid,
                               clock,
                               closure = ScalarDiffusivity(ν = κₜ, κ = κₜ),
                               biogeochemistry,
-                              boundary_conditions = (NUT = FieldBoundaryConditions(bottom = ValueBoundaryCondition(10.0)),
-                                                     OXY = FieldBoundaryConditions(top = GasExchange(; gas = :OXY), bottom = OXY_bottom_flux),
-                              #OXY = FieldBoundaryConditions(top = GasExchange(; gas = :OXY), bottom = ValueBoundaryCondition(80.0)),
+                              boundary_conditions = (NUT = FieldBoundaryConditions(bottom = NUT_bottom ),
+                                                     DOM = FieldBoundaryConditions(bottom = DOM_bottom ),
+                                                    # OXY = FieldBoundaryConditions(top = GasExchange(; gas = :OXY), bottom = OXY_bottom_flux),
+                                                     OXY = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom ),
                                                      ),
                               auxiliary_fields = (; T, S))
 #¤                              boundary_conditions = (DIC = FieldBoundaryConditions(top = CO₂_flux), ),
