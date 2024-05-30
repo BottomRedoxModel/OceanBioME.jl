@@ -21,6 +21,11 @@ using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
 using JLD2
 
+import Oceananigans.Biogeochemistry: update_tendencies!
+import Oceananigans.Biogeochemistry: required_biogeochemical_tracers,
+                                     required_biogeochemical_auxiliary_fields,
+                                     biogeochemical_drift_velocity
+
 const year = years = 365days
 nothing #hide
 
@@ -59,11 +64,27 @@ biogeochemistry = OXYDEP(; grid,
 clock = Clock(; time = 0.0)
 T = FunctionField{Center, Center, Center}(temp, grid; clock)
 S = FunctionField{Center, Center, Center}(salt, grid; clock)
+#---------------------------
+# B O U N D A R Y   C O N D
+#---------------------------
+#model = OXYDEP
+#OxygenDepletionModel.sinking_speeds
+#ww = biogeochemical_drift_velocity(OXYDEP, POM).w
+#www = OxygeDepletionModel.sinking_velocities
+#www = OXYDEP.sinking_velocities
+
+#www = OXYDEP.sinking_velocities.POM.w
+#bgc.
+#biogeochemistry = bgc.underlying_biogeochemistry
+#w = bgc.sinking_velocities[PHY]
+#ww = biogeochemical_drift_velocity(OXYDEP, PHY).w
+#ww = biogeochemical_drift_velocity(bgc, PHY).w
+#ww = biogeochemical_drift_velocity(bgc, val_tracer).w
 
 # for the bottom boundary
 O2_suboxic = 30.0 
 Trel = 100000. # relaxation time, s
-b_ox = 50.0 #15.0    # dufference of DO conc. across SWI, uM
+b_ox = 15.0 #15.0    # dufference of DO conc. across SWI, uM
 b_NUT = 20.
 b_DOM_ox = 2.0
 b_DOM_anox =10.0
@@ -95,28 +116,41 @@ b_DOM_anox =10.0
 
 OXY_top = GasExchange(; gas = :OXY)
 @inline OXY_bottom_cond(i, j, grid, clock, fields) =  
-    @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * b_ox + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.OXY[i, j, 1])) / Trel
+    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * b_ox + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.OXY[i, j, 1])) / Trel
 OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
 
+#@inline DOM_bottom_cond(x, y, t, OXY, DOM) = F_ox(OXY, O2_suboxic) * (b_DOM_ox - DOM) / Trel
+# @inline DOM_bottom_cond(i, j, k, grid, clock, OXY, DOM, ) = @inbounds F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) / Trel
+ #   @inbounds  (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1]))/ Trel
 
-@inline DOM_bottom_cond(i, j, k, grid, clock, fields) =  
-    @inbounds  (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1]))/ Trel
-DOM_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
+@inline DOM_bottom_cond(i, j, grid, clock, fields ) =  
+    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])) / Trel
+DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true) #, parameters = (; O2_suboxic, b_DOM_ox, Trel),)
 
-#@inline NUT_bottom_con(i, j, k, grid, clock, fields) =  
-#    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])) / Trel       
+# DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true, field_dependencies=(:OXY, :DOM), parameters = (; O2_suboxic, b_DOM_ox, Trel),)
+
+
+#@inline DOM_bottom_cond(i, j, k, grid, clock, fields=(:OXY, :DOM),) =  
+#    @inbounds  (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1]))/ Trel
+
+#DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, field_dependencies=(:OXY, :DOM), )
+
+#@inline NUT_bottom_cond(i, j, k, grid, clock, fields) =  
+#    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_NUT - fields.DOM[i, j, 1])) / Trel       
 
     #    @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1]))/ Trel
 
-#NUT_bottom = FluxBoundaryCondition(NUT_bottom_con,  discrete_form = true,) #ValueBoundaryCondition(10.0)
+#NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond,  discrete_form = true,) #ValueBoundaryCondition(10.0)
 NUT_bottom = ValueBoundaryCondition(10.0)
+
+
 
 model = NonhydrostaticModel(; grid,
                               clock,
                               closure = ScalarDiffusivity(ν = κₜ, κ = κₜ),
                               biogeochemistry,
                               boundary_conditions = (NUT = FieldBoundaryConditions(bottom = NUT_bottom ),
-                                                     DOM = FieldBoundaryConditions(bottom = DOM_bottom ),
+                                                     DOM = FieldBoundaryConditions(bottom = DOM_bottom),
                                                     # OXY = FieldBoundaryConditions(top = GasExchange(; gas = :OXY), bottom = OXY_bottom_flux),
                                                      OXY = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom ),
                                                      ),
@@ -132,7 +166,7 @@ set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, OXY = 150., DOM = 1.)  ## initia
 # - Show the progress of the simulation
 # - Store the model and particles output
 
-stoptime = 1095 #1825
+stoptime = 1095 #1095 #730 #1825
 
 simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days) 
 
