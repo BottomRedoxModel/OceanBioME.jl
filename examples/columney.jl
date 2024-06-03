@@ -36,7 +36,7 @@ nothing #hide
 @inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
 @inline fmld1(t) = H(t, 50days, year) * (1 / (1 + exp(-(t - 100days) / 5days))) * (1 / (1 + exp((t - 330days) / 25days)))
 @inline MLD(t) = - (10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
-@inline κₜ(x, y, z, t) = 10e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 0.5e-4    ### 1e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1e-4
+@inline κₜ(x, y, z, t) = 0.5e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 0.5e-4    ### 1e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1e-4
 @inline temp(x, y, z, t) = 2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 10
 @inline salt(x, y, z, t) = (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 33
 
@@ -44,8 +44,8 @@ nothing #hide
 
 # ## Grid
 # Define the grid.
-depth_extent=40meters
-grid = RectilinearGrid(size = (1, 1, 10), extent = (20meters, 20meters, depth_extent))
+depth_extent=100meters
+grid = RectilinearGrid(size = (1, 1, 25), extent = (20meters, 20meters, depth_extent))
 
 # ## Model
 # First we define the biogeochemical model including carbonate chemistry (for which we also define temperature (``T``) and salinity (``S``) fields)
@@ -71,54 +71,47 @@ S = FunctionField{Center, Center, Center}(salt, grid; clock)
 # B O U N D A R Y   C O N D
 #---------------------------
 # for the bottom boundary
-O2_suboxic = 30.0 
-Trel = 10000. # relaxation time, s
-b_ox = 15.0 #15.0    # difference of DO conc. across SWI, uM
-b_NUT = 20.
-b_DOM_ox = 5.0
-b_DOM_anox =20.0
-bu = 0.5 #
+O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
+Trel = 10000.      # Relaxation time for exchange with the sediments (s/m)
+b_ox = 15.0        # difference of OXY in the sediment and water, 
+b_NUT = 20.        # NUT in the sediment, (mmol/m3)  
+b_DOM_ox = 10.0    # OM in the sediment (oxic conditions), (mmol/m3) 
+b_DOM_anox =20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
+bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+
 @inline F_ox(conc,threshold)    = (0.5+0.5*tanh(conc-threshold))
 @inline F_subox(conc,threshold) = (0.5-0.5*tanh(conc-threshold))
 
 #---OXY----------------------
 OXY_top = GasExchange(; gas = :OXY)
-@inline OXY_bottom_cond(i, j, grid, clock, fields) =  
+  @inline OXY_bottom_cond(i, j, grid, clock, fields) =  
     @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * b_ox + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.OXY[i, j, 1])) / Trel
 OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
 
 #---DOM----------------------
-@inline DOM_bottom_cond(i, j, grid, clock, fields ) =  
+  @inline DOM_bottom_cond(i, j, grid, clock, fields ) =  
     @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])) / Trel
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true) #, parameters = (; O2_suboxic, b_DOM_ox, Trel),)
 
 #---NUT----------------------
-@inline NUT_bottom_cond(i, j, grid, clock, fields ) =  
+  @inline NUT_bottom_cond(i, j, grid, clock, fields ) =  
     @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_NUT - fields.NUT[i, j, 1])) / Trel
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond,  discrete_form = true,) #ValueBoundaryCondition(10.0)
 
 #---POM----------------------
-w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1] 
-@inline POM_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_POM * fields.POM[i, j, 1] 
+  w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1] 
+  @inline POM_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_POM * fields.POM[i, j, 1] 
 POM_bottom = FluxBoundaryCondition(POM_bottom_cond,  discrete_form = true,)
 
 #---PHY----------------------
-w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1] 
-@inline PHY_bottom_cond(i, j, grid, clock, fields ) = @inbounds  - bu * w_PHY * fields.PHY[i, j, 1] 
+  w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1] 
+  @inline PHY_bottom_cond(i, j, grid, clock, fields ) = @inbounds  - bu * w_PHY * fields.PHY[i, j, 1] 
 PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond,  discrete_form = true,)
 
 #---HET----------------------
-w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
-@inline HET_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_HET *  fields.HET[i, j, 1] 
+  w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
+  @inline HET_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_HET *  fields.HET[i, j, 1] 
 HET_bottom = FluxBoundaryCondition(HET_bottom_cond,  discrete_form = true,)
-
-#println(POM_bottom_cond, POM_bottom)
-#sleep(90)
-#for (i, t) in enumerate(times)
-#    air_sea_CO₂_flux[i] = CO₂_flux.condition.func(0.0, 0.0, t, DIC[1, 1, grid.Nz, i], Alk[1, 1, grid.Nz, i], temp(1, 1, 0, t), 35)
-#    carbon_export[i] = (sPOM[1, 1, grid.Nz-20, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:sPOM)).w[1, 1, grid.Nz-20] +
-#                        bPOM[1, 1, grid.Nz-20, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:bPOM)).w[1, 1, grid.Nz-20]) * redfield(Val(:sPOM), model.biogeochemistry)
-#end
 
 #---------------------------
 # Model instantiation
@@ -140,14 +133,14 @@ model = NonhydrostaticModel(; grid,
 
 #¤ set!(model, P = 0.03, Z = 0.03, NO₃ = 4.0, NH₄ = 0.05, DIC = 2239.8, Alk = 2409.0)
 
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, OXY = 150., DOM = 1.)  ## initial conditions
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, OXY = 350., DOM = 1.)  ## initial conditions
 
 # ## Simulation
 # Next we setup a simulation and add some callbacks that:
 # - Show the progress of the simulation
 # - Store the model and particles output
 
-stoptime = 365 #1095 #730 #1825
+stoptime = 1095 #1095 #730 #1825
 
 simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days) 
 
@@ -210,8 +203,7 @@ fig = Figure(size = (1500, 1000), fontsize = 20)
 #axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)", limits = ((0, times[end] / days), (-200meters, 0)))
 #axis_kwargs = (ylabel = "z (m)", limits = ((0, times[end] / days), (-200meters, 0)))
 axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)",
-                #limits = ((0, times[end] / days), (-depth_extent, 0)),
-                limits = ((0, times[end] / days), (-55, 15)),
+                limits = ((0, times[end] / days), (-(depth_extent+15), 15)),
                 xticks = collect(0:365:stoptime))
 
 axPHY = Axis(fig[1, 3]; title = "PHY, mmolN/m³", axis_kwargs...)
