@@ -77,7 +77,7 @@ b_ox = 15.0 #15.0    # difference of DO conc. across SWI, uM
 b_NUT = 20.
 b_DOM_ox = 5.0
 b_DOM_anox =20.0
-bu = 0.0001 #
+bu = 0.5 #
 @inline F_ox(conc,threshold)    = (0.5+0.5*tanh(conc-threshold))
 @inline F_subox(conc,threshold) = (0.5-0.5*tanh(conc-threshold))
 
@@ -99,13 +99,12 @@ NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond,  discrete_form = true,) #Val
 
 #---POM----------------------
 w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1] 
-@inline POM_bottom_cond(i, j, grid, clock, fields ) = @inbounds bu * w_POM * fields.POM[i, j, 1] 
+@inline POM_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_POM * fields.POM[i, j, 1] 
 POM_bottom = FluxBoundaryCondition(POM_bottom_cond,  discrete_form = true,)
-println("w_POM: ", w_POM, "bu: ", bu)
 
 #---PHY----------------------
 w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1] 
-@inline PHY_bottom_cond(i, j, grid, clock, fields ) = @inbounds bu * w_PHY * fields.PHY[i, j, 1] 
+@inline PHY_bottom_cond(i, j, grid, clock, fields ) = @inbounds  - bu * w_PHY * fields.PHY[i, j, 1] 
 PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond,  discrete_form = true,)
 
 #---HET----------------------
@@ -211,7 +210,8 @@ fig = Figure(size = (1500, 1000), fontsize = 20)
 #axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)", limits = ((0, times[end] / days), (-200meters, 0)))
 #axis_kwargs = (ylabel = "z (m)", limits = ((0, times[end] / days), (-200meters, 0)))
 axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)",
-                limits = ((0, times[end] / days), (-depth_extent, 0)),
+                #limits = ((0, times[end] / days), (-depth_extent, 0)),
+                limits = ((0, times[end] / days), (-55, 15)),
                 xticks = collect(0:365:stoptime))
 
 axPHY = Axis(fig[1, 3]; title = "PHY, mmolN/m³", axis_kwargs...)
