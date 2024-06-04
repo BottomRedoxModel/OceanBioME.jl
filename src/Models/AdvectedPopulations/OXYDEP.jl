@@ -191,7 +191,7 @@ function OxygenDepletionModel(; grid,
                                                                                                   
                                    sediment_model::S = nothing,
  
-                                   sinking_speeds = (PHY = 0.1/day, HET = 0.01/day, POM = 3.0/day),
+                                   sinking_speeds = (PHY = 0.15/day, HET = 0.4/day, POM = 8.0/day),
                                    open_bottom::Bool = true,
 
                                    scale_negatives = false,
