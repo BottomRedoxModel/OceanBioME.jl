@@ -88,20 +88,10 @@ OXY_top = GasExchange(; gas = :OXY)
     @inbounds - (F_ox(fields.OXY[i, j, 1], O2_suboxic) * b_ox + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.OXY[i, j, 1])) / Trel
 OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
 
-#---DOM----------------------
-  @inline DOM_bottom_cond(i, j, grid, clock, fields ) =  
-    @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])) / Trel
-DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true) #, parameters = (; O2_suboxic, b_DOM_ox, Trel),)
-
 #---NUT----------------------
   @inline NUT_bottom_cond(i, j, grid, clock, fields ) =  
-    @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_NUT - fields.NUT[i, j, 1])) / Trel
+    @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])) / Trel
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond,  discrete_form = true,) #ValueBoundaryCondition(10.0)
-
-#---POM----------------------
-  w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1] 
-  @inline POM_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_POM * fields.POM[i, j, 1] 
-POM_bottom = FluxBoundaryCondition(POM_bottom_cond,  discrete_form = true,)
 
 #---PHY----------------------
   w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1] 
@@ -113,6 +103,17 @@ PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond,  discrete_form = true,)
   @inline HET_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_HET *  fields.HET[i, j, 1] 
 HET_bottom = FluxBoundaryCondition(HET_bottom_cond,  discrete_form = true,)
 
+#---POM----------------------
+w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1] 
+@inline POM_bottom_cond(i, j, grid, clock, fields ) = @inbounds - bu * w_POM * fields.POM[i, j, 1] 
+POM_bottom = FluxBoundaryCondition(POM_bottom_cond,  discrete_form = true,)
+
+#---DOM----------------------
+DOM_top = ValueBoundaryCondition(2.0)
+@inline DOM_bottom_cond(i, j, grid, clock, fields ) =  
+@inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])) / Trel
+DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true) #, parameters = (; O2_suboxic, b_DOM_ox, Trel),)
+
 #---------------------------
 # Model instantiation
 #---------------------------
@@ -123,7 +124,7 @@ model = NonhydrostaticModel(; grid,
                               biogeochemistry,
                               boundary_conditions = (OXY = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom ),
                                                      NUT = FieldBoundaryConditions(bottom = NUT_bottom ),
-                                                     DOM = FieldBoundaryConditions(bottom = DOM_bottom),
+                                                     DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
                                                      POM = FieldBoundaryConditions(bottom = POM_bottom),
                                                      PHY = FieldBoundaryConditions(bottom = PHY_bottom),
                                                      HET = FieldBoundaryConditions(bottom = HET_bottom),
@@ -193,8 +194,20 @@ z = jldopen("$filename.jld2")["grid"]["zᵃᵃᶜ"] #[3:29]  #[1:51] #[3:54]
 times = T.times
 nothing #hide
 
+nitrogen_burying = zeros(length(times))
+for (i, t) in enumerate(times)
+#    air_sea_CO₂_flux[i] = CO₂_flux.condition.func(0.0, 0.0, t, DIC[1, 1, grid.Nz, i], Alk[1, 1, grid.Nz, i], temp(1, 1, 0, t), 35)
+nitrogen_burying[i] = (POM[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1]
+                     + PHY[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1]
+                     + HET[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
+                      )
+end
+
+#---------------------------------------------------------------------------------------
 # ## Plot
+#---------------------------------------------------------------------------------------
 # Finally, we plot!
+
 
 using CairoMakie
 
@@ -244,5 +257,12 @@ Colorbar(fig[2, 6], hmT)
 axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
 hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC10) # :linear_grey_0_100_c0_n256)
 Colorbar(fig[1, 6], hmPAR)
+
+axNburying = Axis(fig[3, 5], xlabel = "Time (days)", ylabel = "Flux (mmolN/m²/year)",
+                         title = "N burying", limits = ((0, times[end] / days), nothing))
+#lines!(axfDIC, times / days, air_sea_CO₂_flux / 1e3 * CO₂_molar_mass * year, linewidth = 3, label = "Air-sea flux")
+lines!(axNburying, times / days, nitrogen_burying / 1e3 * year, linewidth = 3, label = "N burying")
+Legend(fig[4, 5], axNburying, framevisible = false)
+
 
 fig
