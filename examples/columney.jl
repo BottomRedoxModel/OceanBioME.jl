@@ -36,7 +36,7 @@ nothing #hide
 @inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
 @inline fmld1(t) = H(t, 50days, year) * (1 / (1 + exp(-(t - 100days) / 5days))) * (1 / (1 + exp((t - 330days) / 25days)))
 @inline MLD(t) = - (10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
-@inline κₜ(x, y, z, t) = 0.5e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 0.5e-4    ### 1e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1e-4
+@inline κₜ(x, y, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3    ### 1e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1e-4
 @inline temp(x, y, z, t) = 2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 10
 @inline salt(x, y, z, t) = (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 33
 
@@ -74,7 +74,7 @@ S = FunctionField{Center, Center, Center}(salt, grid; clock)
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
 Trel = 10000.      # Relaxation time for exchange with the sediments (s/m)
 b_ox = 15.0        # difference of OXY in the sediment and water, 
-b_NUT = 20.        # NUT in the sediment, (mmol/m3)  
+b_NUT = 15.        # NUT in the sediment, (mmol/m3)  
 b_DOM_ox = 10.0    # OM in the sediment (oxic conditions), (mmol/m3) 
 b_DOM_anox =20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
 bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
@@ -109,7 +109,7 @@ w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
 POM_bottom = FluxBoundaryCondition(POM_bottom_cond,  discrete_form = true,)
 
 #---DOM----------------------
-DOM_top = ValueBoundaryCondition(2.0)
+DOM_top = ValueBoundaryCondition(0.0)
 @inline DOM_bottom_cond(i, j, grid, clock, fields ) =  
 @inbounds (F_ox(fields.OXY[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.OXY[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])) / Trel
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true) #, parameters = (; O2_suboxic, b_DOM_ox, Trel),)
@@ -216,29 +216,28 @@ fig = Figure(size = (1500, 1000), fontsize = 20)
 #axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)", limits = ((0, times[end] / days), (-200meters, 0)))
 #axis_kwargs = (ylabel = "z (m)", limits = ((0, times[end] / days), (-200meters, 0)))
 axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)",
-                limits = ((0, times[end] / days), (-(depth_extent+15), 15)),
+                limits = ((0, times[end] / days), (-(depth_extent+10), 10)),
                 xticks = collect(0:365:stoptime))
 
 axPHY = Axis(fig[1, 3]; title = "PHY, mmolN/m³", axis_kwargs...)
-hmPHY = heatmap!(times / days, z, interior(PHY, 1, 1, :, :)', colormap = Reverse(:davos100))
+hmPHY = heatmap!(times / days, z, interior(PHY, 1, 1, :, :)', colormap = Reverse(:cubehelix)) #(:davos10))
 Colorbar(fig[1, 4], hmPHY)
 
 axHET = Axis(fig[2, 3]; title = "HET, mmolN/m³", axis_kwargs...)
-hmHET = heatmap!(times / days, z, interior(HET, 1, 1, :, :)', colormap = Reverse(:pink))
+hmHET = heatmap!(times / days, z, interior(HET, 1, 1, :, :)', colormap = Reverse(:afmhot))
 Colorbar(fig[2, 4], hmHET)
 
 axPOM = Axis(fig[3, 3]; title = "POM, mmolN/m³", axis_kwargs...)
-hmPOM = heatmap!(times / days, z, interior(POM, 1, 1, :, :)', colormap = Reverse(:bilbao25))
+hmPOM = heatmap!(times / days, z, interior(POM, 1, 1, :, :)', colormap = Reverse(:greenbrownterrain)) #(:bilbao25))
 Colorbar(fig[3, 4], hmPOM)
 
 axDOM = Axis(fig[3, 1]; title = "DOM, mmolN/m³", axis_kwargs...)
-hmDOM = heatmap!(times / days, z, interior(DOM, 1, 1, :, :)', colormap = Reverse(:devon10))
+hmDOM = heatmap!(times / days, z, interior(DOM, 1, 1, :, :)', colormap = Reverse(:CMRmap)) #(:devon10))
 Colorbar(fig[3, 2], hmDOM)
 
 axNUT = Axis(fig[1, 1]; title = "NUT, mmolN/m³", axis_kwargs...)
 hmNUT = heatmap!(times / days, z, interior(NUT, 1, 1, :, :)', colormap =  Reverse(:cherry))
 Colorbar(fig[1, 2], hmNUT)
-
 
 axOXY = Axis(fig[2, 1]; title = "OXY, mmol/m³", axis_kwargs...)
 hmOXY = heatmap!(times / days, z, interior(OXY, 1, 1, :, :)', colormap = :turbo)
@@ -255,7 +254,7 @@ Colorbar(fig[2, 6], hmT)
 #Colorbar(fig[2, 4], hmS)
 
 axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
-hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC10) # :linear_grey_0_100_c0_n256)
+hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
 Colorbar(fig[1, 6], hmPAR)
 
 axNburying = Axis(fig[3, 5], xlabel = "Time (days)", ylabel = "Flux (mmolN/m²/year)",
