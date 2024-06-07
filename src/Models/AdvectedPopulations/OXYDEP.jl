@@ -159,19 +159,19 @@ function OxygenDepletionModel(; grid,
                                    alphaI::FT = 1.8,   # [d-1/(W/m2)]
                                    betaI::FT = 5.2e-4, # [d-1/(W/m2)]
                                    gammaD::FT = 0.71,  # (-)
-                                   Max_uptake::FT = 2.0 / day,  # 1/d 4 5
+                                   Max_uptake::FT = 2.5 / day,  # 1/d 2.0 4 5
                                    Knut::FT = 2.,            # (nd)
-                                   r_phy_nut::FT = 0.05 / day, # 1/d
+                                   r_phy_nut::FT = 0.10 / day, # 1/d
                                    r_phy_pom::FT = 0.15 / day, # 1/d
                                    r_phy_dom::FT = 0.17 / day, # 1/d
-                                   r_phy_het::FT = 0.4 / day,  # 1/d
-                                   Kphy::FT = 0.7,             # (nd)
-                                   r_pom_het::FT = 0.7 / day,  # 1/d
+                                   r_phy_het::FT = 2.0 / day,  # 1/d 0.4
+                                   Kphy::FT = 0.1,             # (nd) 0.7
+                                   r_pom_het::FT = 0.7 / day,  # 1/d 0.7
                                    Kpom::FT = 2.0,     # (nd)
                                    Uz::FT = 0.6,       # (nd)
                                    Hz::FT = 0.5,       # (nd)
-                                   r_het_nut::FT = 0.05 / day,      # 1/d
-                                   r_het_pom::FT = 0.02 / day,      # 1/d
+                                   r_het_nut::FT = 0.15 / day,      # 1/d 0.05
+                                   r_het_pom::FT = 0.10 / day,      # 1/d 0.02
                                    r_pom_nut_oxy::FT = 0.006 / day, # 1/d
                                    r_pom_dom::FT = 0.01 /day,      # 1/d
                                    r_dom_nut_oxy::FT = 0.050 /day,  # 1/d
@@ -191,7 +191,7 @@ function OxygenDepletionModel(; grid,
                                                                                                   
                                    sediment_model::S = nothing,
  
-                                   sinking_speeds = (PHY = 0.15/day, HET = 0.4/day, POM = 8.0/day),
+                                   sinking_speeds = (PHY = 0.15/day, HET = 0.4/day, POM = 10.0/day),
                                    open_bottom::Bool = true,
 
                                    scale_negatives = false,
@@ -275,7 +275,7 @@ required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
 @inline GrazPhy(r_phy_het,Kphy,PHY,HET) = r_phy_het*yy(Kphy,max(0.,PHY-0.01)/max(0.0001,HET))*HET
 @inline GrazPOM(r_pom_het,Kpom,POM,HET) = r_pom_het*yy(Kpom,max(0.,POM-0.01)/max(0.0001,HET))*HET   
 @inline RespHet(r_het_nut,HET) = r_het_nut * HET
-@inline MortHet(r_het_pom,HET) = r_het_pom * HET 
+@inline MortHet(r_het_pom,HET,OXY,O2_suboxic) = (r_het_pom  + F_subox(OXY,O2_suboxic) * 0.01 * r_het_pom) * HET
 
 # POM
 @inline POM_decay_ox(r_pom_nut_oxy,POM)= r_pom_nut_oxy * POM
@@ -341,9 +341,10 @@ end
     r_het_nut = bgc.r_het_nut
     r_het_pom = bgc.r_het_pom
     Uz = bgc.Uz
+    O2_suboxic = bgc.O2_suboxic
 
     return (Uz*(GrazPhy(r_phy_het,Kphy,PHY,HET)+GrazPOM(r_pom_het,Kpom,POM,HET))
-           - MortHet(r_het_pom,HET) - RespHet(r_het_nut,HET) 
+           - MortHet(r_het_pom,HET,OXY,O2_suboxic) - RespHet(r_het_nut,HET) 
            )
 end
 
@@ -362,7 +363,7 @@ end
     O2_suboxic = bgc.O2_suboxic
 
     return ((1.0-Uz) * (1.0-Hz) * (GrazPhy(r_phy_het,Kphy,PHY,HET) + GrazPOM(r_pom_het,Kpom,POM,HET)) 
-            + MortPhy(r_phy_pom,PHY) +   MortHet(r_het_pom,HET) - POM_decay_ox(r_pom_nut_oxy,POM) 
+            + MortPhy(r_phy_pom,PHY) +   MortHet(r_het_pom,HET,OXY,O2_suboxic) - POM_decay_ox(r_pom_nut_oxy,POM) 
             - Autolys(r_pom_dom,POM) - GrazPOM(r_pom_het,Kpom,POM,HET)
             - POM_decay_denitr(r_pom_nut_nut,POM,OXY,O2_suboxic,NUT) 
             )
